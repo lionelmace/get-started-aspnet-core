@@ -1,0 +1,76 @@
+---
+# Application to deploy
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: aspnetapp
+spec:
+  replicas: 2 # tells deployment to run 2 pods
+  selector:
+    matchLabels:
+      app: aspnetapp
+  template:   # create pods using pod definition in this template
+    metadata:
+      labels:
+        app: aspnetapp
+        tier: frontend
+    spec:
+      containers:
+      - name: aspnetapp
+        image: de.icr.io/cr-lma/aspnet:2.2
+        imagePullPolicy: Always
+        resources:
+          requests:
+            cpu: 250m     # 250 millicores = 1/4 core
+            memory: 128Mi # 128 MB
+          limits:
+            cpu: 500m
+            memory: 384Mi
+        # envFrom:
+        # - secretRef:
+        #     name: cloudant
+        #     optional: true
+        env:
+        - name: CLOUDANT_URL
+          valueFrom:
+            secretKeyRef:
+              name: cloudant
+              key: url
+              optional: true
+---
+apiVersion: extensions/v1beta1
+kind: Ingress
+metadata:
+  name: aspnetapp-ingress
+  annotations:
+    # Force the use of https if the request is http
+    ingress.bluemix.net/redirect-to-https: "True"
+spec:
+  tls:
+  - hosts:
+    - mycluster-949312-16181e614890c5058ff637789396375b-0000.eu-de.containers.appdomain.cloud
+    secretName: mycluster-949312-16181e614890c5058ff637789396375b-0000
+  rules:
+  - host: mycluster-949312-16181e614890c5058ff637789396375b-0000.eu-de.containers.appdomain.cloud
+    http:
+      paths:
+      - path: /
+        backend:
+          serviceName: aspnetapp
+          servicePort: 80
+---
+# Service to expose frontend
+apiVersion: v1
+kind: Service
+metadata:
+  name: aspnetapp
+  labels:
+    app: aspnetapp
+    tier: frontend
+spec:
+  ports:
+  - protocol: TCP
+    port: 80
+  selector:
+    app: aspnetapp
+    tier: frontend
